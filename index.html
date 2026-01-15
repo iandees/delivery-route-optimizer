@@ -1,0 +1,1352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mutual Aid Delivery Route Optimizer</title>
+    <script src="https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.js"></script>
+    <link href="https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.css" rel="stylesheet" />
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: #f5f5f5;
+        }
+
+        .container {
+            display: flex;
+            height: 100vh;
+        }
+
+        .sidebar {
+            width: 400px;
+            background: white;
+            padding: 20px;
+            overflow-y: auto;
+            box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+            z-index: 1;
+        }
+
+        .sidebar h1 {
+            font-size: 1.5rem;
+            margin-bottom: 5px;
+            color: #333;
+        }
+
+        .sidebar .subtitle {
+            color: #666;
+            font-size: 0.9rem;
+            margin-bottom: 20px;
+        }
+
+        .map-container {
+            flex: 1;
+            position: relative;
+        }
+
+        #map {
+            width: 100%;
+            height: 100%;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 5px;
+            color: #444;
+        }
+
+        input[type="text"],
+        input[type="number"],
+        input[type="password"] {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #3887be;
+        }
+
+        .btn {
+            padding: 10px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: background 0.2s;
+        }
+
+        .btn-primary {
+            background: #3887be;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #2d6a9f;
+        }
+
+        .btn-secondary {
+            background: #e0e0e0;
+            color: #333;
+        }
+
+        .btn-secondary:hover {
+            background: #d0d0d0;
+        }
+
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #218838;
+        }
+
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+            padding: 5px 10px;
+            font-size: 12px;
+        }
+
+        .btn-danger:hover {
+            background: #c82333;
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .dropoff-list {
+            margin-top: 10px;
+        }
+
+        .dropoff-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px;
+            background: #f9f9f9;
+            border-radius: 6px;
+            margin-bottom: 8px;
+        }
+
+        .dropoff-item .number {
+            width: 24px;
+            height: 24px;
+            background: #3887be;
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: bold;
+            flex-shrink: 0;
+        }
+
+        .dropoff-item .address {
+            flex: 1;
+            font-size: 13px;
+            word-break: break-word;
+        }
+
+        .section {
+            border-top: 1px solid #eee;
+            padding-top: 15px;
+            margin-top: 15px;
+        }
+
+        .section h2 {
+            font-size: 1.1rem;
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+        .add-dropoff-container {
+            display: flex;
+            gap: 8px;
+        }
+
+        .add-dropoff-container input {
+            flex: 1;
+        }
+
+        .status {
+            padding: 10px;
+            border-radius: 6px;
+            margin-bottom: 15px;
+            font-size: 14px;
+        }
+
+        .status.loading {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .route-legend {
+            margin-top: 15px;
+        }
+
+        .route-legend-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px;
+            background: #f9f9f9;
+            border-radius: 6px;
+            margin-bottom: 8px;
+            cursor: pointer;
+        }
+
+        .route-legend-item:hover {
+            background: #f0f0f0;
+        }
+
+        .route-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 4px;
+            flex-shrink: 0;
+        }
+
+        .route-legend-item .info {
+            flex: 1;
+        }
+
+        .route-legend-item .driver-name {
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .route-legend-item .stops-count {
+            font-size: 12px;
+            color: #666;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        /* Print Styles */
+        @media print {
+            .container {
+                display: block;
+                height: auto;
+            }
+
+            .sidebar {
+                display: none;
+            }
+
+            .map-container {
+                display: none;
+            }
+
+            .print-container {
+                display: block !important;
+            }
+        }
+
+        .print-container {
+            display: none;
+            padding: 20px;
+        }
+
+        .print-route {
+            page-break-after: always;
+            margin-bottom: 30px;
+        }
+
+        .print-route:last-child {
+            page-break-after: avoid;
+        }
+
+        .print-header {
+            border-bottom: 2px solid #333;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+
+        .print-header h1 {
+            font-size: 24px;
+            margin-bottom: 5px;
+        }
+
+        .print-header .date {
+            color: #666;
+        }
+
+        .print-stop {
+            padding: 15px 0;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .print-stop .stop-number {
+            display: inline-block;
+            width: 30px;
+            height: 30px;
+            background: #333;
+            color: white;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 30px;
+            font-weight: bold;
+            margin-right: 15px;
+        }
+
+        .print-stop .stop-address {
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .print-stop .stop-details {
+            margin-left: 45px;
+            color: #666;
+            font-size: 14px;
+        }
+
+        .print-summary {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 6px;
+            margin-top: 20px;
+        }
+
+        .geocode-suggestions {
+            position: absolute;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 1000;
+            width: calc(100% - 80px);
+        }
+
+        .geocode-suggestion {
+            padding: 10px;
+            cursor: pointer;
+            border-bottom: 1px solid #eee;
+        }
+
+        .geocode-suggestion:hover {
+            background: #f5f5f5;
+        }
+
+        .geocode-suggestion:last-child {
+            border-bottom: none;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .api-key-section {
+            background: #fff3cd;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+        }
+
+        .api-key-section.valid {
+            background: #d4edda;
+        }
+
+        .api-key-section p {
+            font-size: 13px;
+            margin-bottom: 10px;
+            color: #666;
+        }
+
+        .api-key-section a {
+            color: #3887be;
+        }
+
+        .directions-step {
+            padding: 8px 0;
+            border-bottom: 1px solid #eee;
+            font-size: 14px;
+        }
+
+        .directions-step:last-child {
+            border-bottom: none;
+        }
+
+        .directions-step .instruction {
+            margin-bottom: 3px;
+        }
+
+        .directions-step .distance {
+            color: #666;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="sidebar">
+            <h1>🚗 Mutual Aid Delivery Routes</h1>
+            <p class="subtitle">Optimize driving routes for your delivery volunteers</p>
+
+            <div class="api-key-section" id="apiKeySection">
+                <label for="mapboxToken">Mapbox Access Token</label>
+                <p>Get your free token at <a href="https://account.mapbox.com/access-tokens/" target="_blank">mapbox.com</a></p>
+                <input type="password" id="mapboxToken" placeholder="pk.xxxxx...">
+                <button class="btn btn-primary" onclick="saveApiKey()" style="margin-top: 10px;">Save Token</button>
+            </div>
+
+            <div id="mainContent" class="hidden">
+                <div class="form-group">
+                    <label for="pickupAddress">📍 Pickup Location (Depot)</label>
+                    <input type="text" id="pickupAddress" placeholder="Enter pickup address...">
+                    <div id="pickupSuggestions" class="geocode-suggestions hidden"></div>
+                </div>
+
+                <div class="form-group">
+                    <label for="numVehicles">🚙 Number of Drivers</label>
+                    <input type="number" id="numVehicles" min="1" max="20" value="2">
+                </div>
+
+                <div class="section">
+                    <h2>📦 Dropoff Locations</h2>
+                    <div class="add-dropoff-container">
+                        <input type="text" id="dropoffInput" placeholder="Enter dropoff address...">
+                        <button class="btn btn-secondary" onclick="addDropoffFromInput()">Add</button>
+                    </div>
+                    <div id="dropoffSuggestions" class="geocode-suggestions hidden"></div>
+                    <div class="dropoff-list" id="dropoffList"></div>
+                </div>
+
+                <div id="statusMessage" class="status hidden"></div>
+
+                <div class="action-buttons">
+                    <button class="btn btn-success" id="optimizeBtn" onclick="optimizeRoutes()">
+                        🗺️ Optimize Routes
+                    </button>
+                    <button class="btn btn-secondary" onclick="clearAll()">Clear All</button>
+                </div>
+
+                <div class="section" id="resultsSection" style="display: none;">
+                    <h2>📋 Optimized Routes</h2>
+                    <div class="route-legend" id="routeLegend"></div>
+                    <div class="action-buttons">
+                        <button class="btn btn-primary" onclick="printDirections()">🖨️ Print All Directions</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="map-container">
+            <div id="map"></div>
+        </div>
+    </div>
+
+    <div class="print-container" id="printContainer"></div>
+
+    <script>
+        // Global state
+        let map = null;
+        let mapboxToken = '';
+        let pickupLocation = null;
+        let dropoffLocations = [];
+        let optimizedRoutes = [];
+        let markers = [];
+        let routeLayers = [];
+
+        // Route colors for different drivers
+        const ROUTE_COLORS = [
+            '#e6194b', '#3cb44b', '#4363d8', '#f58231', '#911eb4',
+            '#46f0f0', '#f032e6', '#bcf60c', '#fabebe', '#008080',
+            '#e6beff', '#9a6324', '#800000', '#808000', '#000075'
+        ];
+
+        // Simplify a LineString using Douglas-Peucker algorithm
+        function simplifyLineString(coords, tolerance) {
+            if (coords.length <= 2) return coords;
+
+            // Helper: perpendicular distance from point to line segment
+            function perpendicularDistance(point, lineStart, lineEnd) {
+                const [x, y] = point;
+                const [x1, y1] = lineStart;
+                const [x2, y2] = lineEnd;
+
+                const dx = x2 - x1;
+                const dy = y2 - y1;
+
+                if (dx === 0 && dy === 0) {
+                    // Line segment is a point
+                    return Math.sqrt((x - x1) ** 2 + (y - y1) ** 2);
+                }
+
+                const t = Math.max(0, Math.min(1, ((x - x1) * dx + (y - y1) * dy) / (dx * dx + dy * dy)));
+                const projX = x1 + t * dx;
+                const projY = y1 + t * dy;
+
+                return Math.sqrt((x - projX) ** 2 + (y - projY) ** 2);
+            }
+
+            // Recursive Douglas-Peucker
+            function douglasPeucker(points, start, end, tolerance) {
+                let maxDist = 0;
+                let maxIndex = 0;
+
+                for (let i = start + 1; i < end; i++) {
+                    const dist = perpendicularDistance(points[i], points[start], points[end]);
+                    if (dist > maxDist) {
+                        maxDist = dist;
+                        maxIndex = i;
+                    }
+                }
+
+                if (maxDist > tolerance) {
+                    const left = douglasPeucker(points, start, maxIndex, tolerance);
+                    const right = douglasPeucker(points, maxIndex, end, tolerance);
+                    return left.slice(0, -1).concat(right);
+                }
+
+                return [points[start], points[end]];
+            }
+
+            return douglasPeucker(coords, 0, coords.length - 1, tolerance);
+        }
+
+        // Encode an array of [lon, lat] coordinates to an encoded polyline (default precision 1e5)
+        // Note: GeoJSON uses [lon, lat] but polyline format encodes as lat, lon
+        function encodePolyline(coords, precision) {
+            precision = precision || 1e5;
+            let result = '';
+            let prevLat = 0;
+            let prevLon = 0;
+
+            function encodeNumber(num) {
+                let encoded = '';
+                while (num >= 0x20) {
+                    encoded += String.fromCharCode((0x20 | (num & 0x1f)) + 63);
+                    num >>= 5;
+                }
+                encoded += String.fromCharCode(num + 63);
+                return encoded;
+            }
+
+            function encodeSignedNumber(num) {
+                num = num < 0 ? ~(num << 1) : (num << 1);
+                return encodeNumber(num);
+            }
+
+            for (let i = 0; i < coords.length; i++) {
+                // GeoJSON format is [lon, lat], but polyline format encodes lat first, then lon
+                const lon = coords[i][0];
+                const lat = coords[i][1];
+                const latE = Math.round(lat * precision);
+                const lonE = Math.round(lon * precision);
+                const dLat = latE - prevLat;
+                const dLon = lonE - prevLon;
+                prevLat = latE;
+                prevLon = lonE;
+                // Encode lat first, then lon (polyline standard)
+                result += encodeSignedNumber(dLat) + encodeSignedNumber(dLon);
+            }
+            return result;
+        }
+
+        // Initialize the app
+        document.addEventListener('DOMContentLoaded', function() {
+            // Check for saved API key
+            const savedToken = localStorage.getItem('mapboxToken');
+            if (savedToken) {
+                mapboxToken = savedToken;
+                initializeMap();
+                document.getElementById('apiKeySection').classList.add('valid');
+                document.getElementById('apiKeySection').innerHTML = `
+                    <p style="color: #155724; margin: 0;">✓ API Token saved. <a href="#" onclick="resetApiKey(); return false;">Change token</a></p>
+                `;
+                document.getElementById('mainContent').classList.remove('hidden');
+            }
+
+            // Set up geocoding for pickup address
+            setupGeocoding('pickupAddress', 'pickupSuggestions', (result) => {
+                pickupLocation = {
+                    name: result.place_name,
+                    coordinates: result.center
+                };
+                updateMap();
+            });
+
+            // Set up geocoding for dropoff address
+            setupGeocoding('dropoffInput', 'dropoffSuggestions', (result) => {
+                addDropoff(result.place_name, result.center);
+                document.getElementById('dropoffInput').value = '';
+            });
+        });
+
+        function saveApiKey() {
+            const token = document.getElementById('mapboxToken').value.trim();
+            if (!token || !token.startsWith('pk.')) {
+                alert('Please enter a valid Mapbox public access token (starts with pk.)');
+                return;
+            }
+            mapboxToken = token;
+            localStorage.setItem('mapboxToken', token);
+            initializeMap();
+            document.getElementById('apiKeySection').classList.add('valid');
+            document.getElementById('apiKeySection').innerHTML = `
+                <p style="color: #155724; margin: 0;">✓ API Token saved. <a href="#" onclick="resetApiKey(); return false;">Change token</a></p>
+            `;
+            document.getElementById('mainContent').classList.remove('hidden');
+        }
+
+        function resetApiKey() {
+            localStorage.removeItem('mapboxToken');
+            location.reload();
+        }
+
+        function initializeMap() {
+            mapboxgl.accessToken = mapboxToken;
+            map = new mapboxgl.Map({
+                container: 'map',
+                style: 'mapbox://styles/mapbox/streets-v12',
+                center: [-98.5795, 39.8283], // Center of US
+                zoom: 4
+            });
+
+            map.addControl(new mapboxgl.NavigationControl());
+        }
+
+        function setupGeocoding(inputId, suggestionsId, onSelect) {
+            const input = document.getElementById(inputId);
+            const suggestionsDiv = document.getElementById(suggestionsId);
+            let debounceTimer;
+
+            input.addEventListener('input', function() {
+                clearTimeout(debounceTimer);
+                const query = this.value.trim();
+
+                if (query.length < 3) {
+                    suggestionsDiv.classList.add('hidden');
+                    return;
+                }
+
+                debounceTimer = setTimeout(async () => {
+                    try {
+                        // If a pickupLocation is set, bias dropoff geocoding results toward it
+                        let proximityParam = '';
+                        if (inputId === 'dropoffInput' && pickupLocation && pickupLocation.coordinates) {
+                            const [pLon, pLat] = pickupLocation.coordinates;
+                            proximityParam = `&proximity=${pLon},${pLat}`;
+                        }
+
+                        const response = await fetch(
+                            `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${mapboxToken}&country=us&types=address,poi${proximityParam}`
+                        );
+                        const data = await response.json();
+
+                        if (data.features && data.features.length > 0) {
+                            suggestionsDiv.innerHTML = data.features.map(f => `
+                                <div class="geocode-suggestion" data-coords="${f.center.join(',')}" data-name="${f.place_name}">
+                                    ${f.place_name}
+                                </div>
+                            `).join('');
+                            suggestionsDiv.classList.remove('hidden');
+
+                            // Add click handlers
+                            suggestionsDiv.querySelectorAll('.geocode-suggestion').forEach(el => {
+                                el.addEventListener('click', function() {
+                                    const coords = this.dataset.coords.split(',').map(Number);
+                                    const name = this.dataset.name;
+                                    input.value = name;
+                                    suggestionsDiv.classList.add('hidden');
+                                    onSelect({ place_name: name, center: coords });
+                                });
+                            });
+                        } else {
+                            suggestionsDiv.classList.add('hidden');
+                        }
+                    } catch (error) {
+                        console.error('Geocoding error:', error);
+                    }
+                }, 300);
+            });
+
+            // Hide suggestions when clicking outside
+            document.addEventListener('click', function(e) {
+                if (!input.contains(e.target) && !suggestionsDiv.contains(e.target)) {
+                    suggestionsDiv.classList.add('hidden');
+                }
+            });
+
+            // Handle enter key
+            input.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    const firstSuggestion = suggestionsDiv.querySelector('.geocode-suggestion');
+                    if (firstSuggestion) {
+                        firstSuggestion.click();
+                    }
+                }
+            });
+        }
+
+        function addDropoffFromInput() {
+            const input = document.getElementById('dropoffInput');
+            const address = input.value.trim();
+            if (!address) return;
+
+            // Trigger geocoding
+            geocodeAddress(address).then(result => {
+                if (result) {
+                    addDropoff(result.place_name, result.center);
+                    input.value = '';
+                }
+            });
+        }
+
+        async function geocodeAddress(address) {
+            try {
+                // Bias manual geocode lookups for dropoffs toward the pickup location when available
+                let proximityParam = '';
+                if (pickupLocation && pickupLocation.coordinates) {
+                    const [pLon, pLat] = pickupLocation.coordinates;
+                    proximityParam = `&proximity=${pLon},${pLat}`;
+                }
+
+                const response = await fetch(
+                    `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(address)}.json?access_token=${mapboxToken}&country=us&types=address,poi${proximityParam}`
+                );
+                const data = await response.json();
+                if (data.features && data.features.length > 0) {
+                    return data.features[0];
+                }
+            } catch (error) {
+                console.error('Geocoding error:', error);
+            }
+            return null;
+        }
+
+        function addDropoff(name, coordinates) {
+            dropoffLocations.push({ name, coordinates });
+            renderDropoffList();
+            updateMap();
+        }
+
+        function removeDropoff(index) {
+            dropoffLocations.splice(index, 1);
+            renderDropoffList();
+            updateMap();
+        }
+
+        function renderDropoffList() {
+            const list = document.getElementById('dropoffList');
+            list.innerHTML = dropoffLocations.map((loc, i) => `
+                <div class="dropoff-item">
+                    <span class="number">${i + 1}</span>
+                    <span class="address">${loc.name}</span>
+                    <button class="btn btn-danger" onclick="removeDropoff(${i})">✕</button>
+                </div>
+            `).join('');
+        }
+
+        function updateMap() {
+            // Clear existing markers
+            markers.forEach(m => m.remove());
+            markers = [];
+
+            if (!map) return;
+
+            const bounds = new mapboxgl.LngLatBounds();
+
+            // Add pickup marker
+            if (pickupLocation) {
+                const el = document.createElement('div');
+                el.innerHTML = '📍';
+                el.style.fontSize = '30px';
+                el.style.cursor = 'pointer';
+
+                const marker = new mapboxgl.Marker(el)
+                    .setLngLat(pickupLocation.coordinates)
+                    .setPopup(new mapboxgl.Popup().setHTML(`<strong>Pickup:</strong><br>${pickupLocation.name}`))
+                    .addTo(map);
+                markers.push(marker);
+                bounds.extend(pickupLocation.coordinates);
+            }
+
+            // Add dropoff markers
+            dropoffLocations.forEach((loc, i) => {
+                const el = document.createElement('div');
+                el.style.background = '#3887be';
+                el.style.color = 'white';
+                el.style.width = '24px';
+                el.style.height = '24px';
+                el.style.borderRadius = '50%';
+                el.style.display = 'flex';
+                el.style.alignItems = 'center';
+                el.style.justifyContent = 'center';
+                el.style.fontWeight = 'bold';
+                el.style.fontSize = '12px';
+                el.style.cursor = 'pointer';
+                el.textContent = i + 1;
+
+                const marker = new mapboxgl.Marker(el)
+                    .setLngLat(loc.coordinates)
+                    .setPopup(new mapboxgl.Popup().setHTML(`<strong>Stop ${i + 1}:</strong><br>${loc.name}`))
+                    .addTo(map);
+                markers.push(marker);
+                bounds.extend(loc.coordinates);
+            });
+
+            // Fit map to bounds
+            if (pickupLocation || dropoffLocations.length > 0) {
+                map.fitBounds(bounds, { padding: 50 });
+            }
+        }
+
+        function showStatus(message, type) {
+            const statusEl = document.getElementById('statusMessage');
+            statusEl.textContent = message;
+            statusEl.className = `status ${type}`;
+            statusEl.classList.remove('hidden');
+        }
+
+        function hideStatus() {
+            document.getElementById('statusMessage').classList.add('hidden');
+        }
+
+        // Helper: assign dropoffs to vehicles using angular sweep clustering around depot
+        function assignClusters(dropoffs, k) {
+            const clusters = Array.from({ length: k }, () => []);
+            if (!pickupLocation || dropoffs.length === 0) return clusters;
+
+            const [depotLon, depotLat] = pickupLocation.coordinates;
+            const withAngle = dropoffs.map((d, i) => {
+                const [lon, lat] = d.coordinates;
+                const angle = Math.atan2(lat - depotLat, lon - depotLon);
+                return { d, angle, i };
+            });
+
+            withAngle.sort((a, b) => a.angle - b.angle);
+
+            for (let i = 0; i < withAngle.length; i++) {
+                clusters[i % k].push(withAngle[i].d);
+            }
+            return clusters;
+        }
+
+        async function optimizeRoutes() {
+            if (!pickupLocation) {
+                alert('Please enter a pickup location');
+                return;
+            }
+
+            if (dropoffLocations.length < 1) {
+                alert('Please add at least one dropoff location');
+                return;
+            }
+
+            const numVehicles = Math.max(1, Math.min(20, parseInt(document.getElementById('numVehicles').value) || 1));
+
+            showStatus('Assigning stops and requesting routes (Optimization v1)...', 'loading');
+            document.getElementById('optimizeBtn').disabled = true;
+
+            try {
+                const clusters = assignClusters(dropoffLocations, numVehicles);
+                optimizedRoutes = [];
+
+                for (let i = 0; i < clusters.length; i++) {
+                    const cluster = clusters[i];
+                    const vehicleName = `Driver ${i + 1}`;
+
+                    if (cluster.length === 0) {
+                        // No stops assigned: create empty route that starts/ends at depot
+                        optimizedRoutes.push({ vehicle: vehicleName, stops: [], directions: null });
+                        continue;
+                    }
+
+                    // Build coordinates string: depot ; stops... ; depot (so vehicle starts/ends at depot)
+                    const coords = [];
+                    coords.push(pickupLocation.coordinates.join(','));
+                    cluster.forEach(c => coords.push(c.coordinates.join(',')));
+                    coords.push(pickupLocation.coordinates.join(','));
+                    const coordsString = coords.join(';');
+
+                    const url = `https://api.mapbox.com/optimized-trips/v1/mapbox/driving/${coordsString}?access_token=${mapboxToken}&geometries=geojson&overview=full&steps=true&roundtrip=false&source=first&destination=last`;
+
+                    try {
+                        const resp = await fetch(url);
+                        if (!resp.ok) {
+                            const txt = await resp.text();
+                            console.error('Optimization v1 error:', txt);
+                            optimizedRoutes.push({ vehicle: vehicleName, stops: cluster, directions: null });
+                            continue;
+                        }
+
+                        const data = await resp.json();
+                        // data.trips is an array; take first
+                        const trip = data.trips && data.trips[0] ? data.trips[0] : null;
+
+                        // Build stops array in order of optimized route (skip depot start and end for stops)
+                        const stops = [];
+                        if (trip && data.waypoints) {
+                            // waypoints correspond to input coordinates; each waypoint has "waypoint_index" (optimized order) and "location" (coords)
+                            // We want to extract waypoints excluding the first and last input (depots)
+                            // Map optimized indices back to input indices
+                            const ordered = Array.from({ length: data.waypoints.length });
+                            data.waypoints.forEach((wp, idx) => {
+                                // waypoint_index is the position in the optimized route
+                                if (typeof wp.waypoint_index === 'number') ordered[wp.waypoint_index] = { input_index: idx, wp };
+                            });
+
+                            // ordered array includes depot at positions 0 and last; skip them
+                            for (let oi = 0; oi < ordered.length; oi++) {
+                                const entry = ordered[oi];
+                                if (!entry) continue;
+                                const inputIdx = entry.input_index;
+                                // input 0 is depot, inputs 1..n are stops, last input is depot
+                                if (inputIdx === 0 || inputIdx === ordered.length - 1) continue;
+                                const stop = cluster[inputIdx - 1];
+                                if (stop) stops.push(stop);
+                            }
+                        }
+
+                        optimizedRoutes.push({ vehicle: vehicleName, stops, directions: trip });
+                    } catch (err) {
+                        console.error('Request error for vehicle', vehicleName, err);
+                        optimizedRoutes.push({ vehicle: vehicleName, stops: cluster, directions: null });
+                    }
+                }
+
+                // Display results
+                await displayRoutes({ routes: optimizedRoutes });
+                showStatus(`Routes optimized! ${optimizedRoutes.length} driver route(s) created.`, 'success');
+                document.getElementById('resultsSection').style.display = 'block';
+
+            } catch (error) {
+                console.error('Optimization error:', error);
+                showStatus(`Error: ${error.message}`, 'error');
+            } finally {
+                document.getElementById('optimizeBtn').disabled = false;
+            }
+        }
+
+        async function displayRoutes(solution) {
+            // Clear existing route layers
+            routeLayers.forEach(layerId => {
+                if (map.getLayer(layerId)) map.removeLayer(layerId);
+                if (map.getSource(layerId)) map.removeSource(layerId);
+            });
+            routeLayers = [];
+
+            // Clear existing markers and re-add them
+            markers.forEach(m => m.remove());
+            markers = [];
+
+            const legendEl = document.getElementById('routeLegend');
+            legendEl.innerHTML = '';
+
+            const bounds = new mapboxgl.LngLatBounds();
+
+            for (let routeIndex = 0; routeIndex < solution.routes.length; routeIndex++) {
+                const route = solution.routes[routeIndex];
+                const color = ROUTE_COLORS[routeIndex % ROUTE_COLORS.length];
+
+                // If we have a directions/trip geometry from Optimization v1, render it
+                if (route.directions && route.directions.geometry) {
+                    const routeGeometry = route.directions.geometry;
+                    const layerId = `route-${routeIndex}`;
+                    map.addSource(layerId, {
+                        type: 'geojson',
+                        data: {
+                            type: 'Feature',
+                            geometry: routeGeometry
+                        }
+                    });
+
+                    map.addLayer({
+                        id: layerId,
+                        type: 'line',
+                        source: layerId,
+                        layout: {
+                            'line-join': 'round',
+                            'line-cap': 'round'
+                        },
+                        paint: {
+                            'line-color': color,
+                            'line-width': 5,
+                            'line-opacity': 0.8
+                        }
+                    });
+
+                    routeLayers.push(layerId);
+
+                    // Extend bounds
+                    routeGeometry.coordinates.forEach(coord => bounds.extend(coord));
+                }
+
+                // Add depot marker once per route (start)
+                if (pickupLocation) {
+                    const el = document.createElement('div');
+                    el.innerHTML = '🏠';
+                    el.style.fontSize = '28px';
+                    el.style.cursor = 'pointer';
+
+                    const marker = new mapboxgl.Marker(el)
+                        .setLngLat(pickupLocation.coordinates)
+                        .setPopup(new mapboxgl.Popup().setHTML(`<strong>Depot</strong><br>${pickupLocation.name}`))
+                        .addTo(map);
+                    markers.push(marker);
+                    bounds.extend(pickupLocation.coordinates);
+                }
+
+                // Add markers for each assigned stop
+                (route.stops || []).forEach((loc, i) => {
+                    const el = document.createElement('div');
+                    el.style.background = color;
+                    el.style.color = 'white';
+                    el.style.width = '28px';
+                    el.style.height = '28px';
+                    el.style.borderRadius = '50%';
+                    el.style.display = 'flex';
+                    el.style.alignItems = 'center';
+                    el.style.justifyContent = 'center';
+                    el.style.fontWeight = 'bold';
+                    el.style.fontSize = '12px';
+                    el.style.cursor = 'pointer';
+                    el.style.border = '2px solid white';
+                    el.style.boxShadow = '0 2px 4px rgba(0,0,0,0.3)';
+                    el.textContent = i + 1;
+
+                    const marker = new mapboxgl.Marker(el)
+                        .setLngLat(loc.coordinates)
+                        .setPopup(new mapboxgl.Popup().setHTML(`<strong>${route.vehicle} - Stop ${i + 1}</strong><br>${loc.name}`))
+                        .addTo(map);
+                    markers.push(marker);
+                    bounds.extend(loc.coordinates);
+                });
+
+                const dropoffStops = (route.stops || []).length;
+                const totalDistance = route.directions ? (route.directions.distance / 1609.34).toFixed(1) : '?';
+                const totalTime = route.directions ? Math.round(route.directions.duration / 60) : '?';
+
+                // Build Google/Apple directions links for the full route
+                const links = buildDirectionsLinks(route);
+
+                // Add to legend (include Google + Apple links, plus print)
+                legendEl.innerHTML += `
+                    <div class="route-legend-item" onclick="focusRoute(${routeIndex})">
+                        <div class="route-color" style="background: ${color}"></div>
+                        <div class="info">
+                            <div class="driver-name">${route.vehicle}</div>
+                            <div class="stops-count">${dropoffStops} stops · ${totalDistance} mi · ~${totalTime} min</div>
+                        </div>
+                        <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end;">
+                            <a href="${links.google}" target="_blank" class="btn btn-secondary" onclick="event.stopPropagation();">Google</a>
+                            <a href="${links.apple}" target="_blank" class="btn btn-secondary" onclick="event.stopPropagation();">Apple</a>
+                            <button class="btn btn-secondary" onclick="event.stopPropagation(); printSingleRoute(${routeIndex})">Print</button>
+                        </div>
+                    </div>
+                `;
+            }
+
+            // Fit map to all routes
+            if (!bounds.isEmpty()) {
+                map.fitBounds(bounds, { padding: 50 });
+            }
+        }
+
+        function focusRoute(routeIndex) {
+            const route = optimizedRoutes[routeIndex];
+            if (!route || !route.directions) return;
+
+            const bounds = new mapboxgl.LngLatBounds();
+            route.directions.geometry.coordinates.forEach(coord => {
+                bounds.extend(coord);
+            });
+            map.fitBounds(bounds, { padding: 50 });
+        }
+
+        // Build Google and Apple Maps directions URLs for a full route (all stops)
+        function buildDirectionsLinks(route) {
+            if (!pickupLocation || !pickupLocation.coordinates) return { google: '#', apple: '#' };
+
+            const depotLat = pickupLocation.coordinates[1];
+            const depotLon = pickupLocation.coordinates[0];
+            const origin = `${depotLat},${depotLon}`;
+            const stops = (route.stops || []);
+
+            if (stops.length === 0) {
+                const google = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(origin)}&travelmode=driving`;
+                const apple = `https://maps.apple.com/?saddr=${encodeURIComponent(origin)}&daddr=${encodeURIComponent(origin)}&dirflg=d`;
+                return { google, apple };
+            }
+
+            // Prepare coords as lat,lon strings
+            const coords = stops.map(s => `${s.coordinates[1]},${s.coordinates[0]}`);
+
+            // Google: origin, destination (last stop), waypoints (all except last)
+            const destination = coords[coords.length - 1];
+            const waypoints = coords.length > 1 ? coords.slice(0, -1).join('|') : '';
+            const google = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(destination)}&travelmode=driving${waypoints ? '&waypoints=' + encodeURIComponent(waypoints) : ''}`;
+
+            // Apple Maps: chain stops using +to: syntax: daddr=stop1+to:stop2+to:stop3
+            const appleDaddr = coords.map(c => encodeURIComponent(c)).join('+to:');
+            const apple = `https://maps.apple.com/?saddr=${encodeURIComponent(origin)}&daddr=${appleDaddr}&dirflg=d`;
+
+            return { google, apple };
+        }
+
+        function printDirections() {
+            generatePrintContent(optimizedRoutes);
+            window.print();
+        }
+
+        function printSingleRoute(routeIndex) {
+            generatePrintContent([optimizedRoutes[routeIndex]]);
+            window.print();
+        }
+
+        function generatePrintContent(routes) {
+            const printContainer = document.getElementById('printContainer');
+            const today = new Date().toLocaleDateString('en-US', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            });
+
+            let html = '';
+
+            routes.forEach((route, routeIndex) => {
+                const color = ROUTE_COLORS[routeIndex % ROUTE_COLORS.length];
+                const dropoffStops = route.stops || [];
+                const totalDistance = route.directions ? (route.directions.distance / 1609.34).toFixed(1) : '?';
+                const totalTime = route.directions ? Math.round(route.directions.duration / 60) : '?';
+
+                // Build a static map image showing the route geometry (if available)
+                let staticMapHtml = '';
+                if (route.directions && route.directions.geometry && route.directions.geometry.coordinates && route.directions.geometry.coordinates.length > 1 && mapboxToken) {
+                    const coordsArr = route.directions.geometry.coordinates;
+                    // Validate coordinate bounds
+                    let coordsValid = true;
+                    for (let ci = 0; ci < coordsArr.length; ci++) {
+                        const c = coordsArr[ci];
+                        const lon = Number(c[0]);
+                        const lat = Number(c[1]);
+                        if (!isFinite(lon) || !isFinite(lat) || lat < -90 || lat > 90 || lon < -180 || lon > 180) {
+                            coordsValid = false;
+                            break;
+                        }
+                    }
+
+                    const colorHex = color.replace('#','');
+
+                    if (coordsValid) {
+                        try {
+                            // Simplify the geometry to reduce coordinate count and URL length
+                            // Use tolerance of 0.0001 degrees (~11 meters) - adjust if needed
+                            const simplified = simplifyLineString(coordsArr, 0.0001);
+
+                            // Encode the simplified polyline (precision 1e5 for Mapbox)
+                            const encoded = encodePolyline(simplified, 1e5);
+
+                            // Build pin overlays for depot and stops
+                            const overlays = [];
+
+                            // Add the path (polyline)
+                            overlays.push(`path-5+${colorHex}(${encodeURIComponent(encoded)})`);
+
+                            // Add depot pin (home icon or 'S' for start)
+                            if (pickupLocation && pickupLocation.coordinates) {
+                                overlays.push(`pin-s+000000(${pickupLocation.coordinates[0]},${pickupLocation.coordinates[1]})`);
+                            }
+
+                            // Add numbered pins for each stop
+                            const usedStops = route.stops || [];
+                            usedStops.forEach((stop, idx) => {
+                                const stopNumber = idx + 1;
+                                // Use pin-s for small pins with numbers 1-99
+                                if (stopNumber <= 99) {
+                                    overlays.push(`pin-s-${stopNumber}+${colorHex}(${stop.coordinates[0]},${stop.coordinates[1]})`);
+                                } else {
+                                    // For stops > 99, just use a plain pin without label
+                                    overlays.push(`pin-s+${colorHex}(${stop.coordinates[0]},${stop.coordinates[1]})`);
+                                }
+                            });
+
+                            // Build the static map URL with all overlays
+                            const overlayString = overlays.join(',');
+                            const staticUrl = `https://api.mapbox.com/styles/v1/mapbox/streets-v12/static/${overlayString}/auto/800x200@2x?access_token=${mapboxToken}`;
+
+                            staticMapHtml = `<img src="${staticUrl}" alt="Route map for ${route.vehicle}" style="width:100%;height:200px;border-radius:6px;margin-bottom:10px;"/>`;
+                        } catch (e) {
+                            console.error('Error building encoded static map URL', e);
+                            // Fall back to marker overlay below
+                            coordsValid = false;
+                        }
+                    }
+
+                    if (!coordsValid) {
+                        try {
+                            // Fallback: render depot + stops as pinned markers (lon,lat)
+                            const markers = [];
+                            // Depot as a larger pin (use dark color)
+                            if (pickupLocation && pickupLocation.coordinates) {
+                                markers.push(`pin-l+000000(${pickupLocation.coordinates[0]},${pickupLocation.coordinates[1]})`);
+                            }
+                            // Stops as small pins with route color
+                            const usedStops = route.stops || [];
+                            usedStops.forEach(s => {
+                                markers.push(`pin-s+${colorHex}(${s.coordinates[0]},${s.coordinates[1]})`);
+                            });
+
+                            if (markers.length > 0) {
+                                const overlay = markers.join(',');
+                                const staticUrl = `https://api.mapbox.com/styles/v1/mapbox/streets-v12/static/${overlay}/auto/800x200@2x?access_token=${mapboxToken}`;
+                                staticMapHtml = `<img src="${staticUrl}" alt="Route map for ${route.vehicle}" style="width:100%;height:200px;border-radius:6px;margin-bottom:10px;"/>`;
+                            } else {
+                                staticMapHtml = '';
+                            }
+                        } catch (e) {
+                            console.error('Error building marker fallback static URL', e);
+                            staticMapHtml = '';
+                        }
+                    }
+                }
+
+                html += `
+                    <div class="print-route">
+                        <div class="print-header">
+                            <h1>🚗 ${route.vehicle} - Delivery Route</h1>
+                            <div class="date">${today}</div>
+                        </div>
+
+                        ${staticMapHtml}
+
+                        <div class="print-summary">
+                            <strong>Summary:</strong> ${dropoffStops.length} deliveries · ${totalDistance} miles · ~${totalTime} minutes total driving time
+                        </div>
+
+                        <h2 style="margin-top: 20px; margin-bottom: 10px;">📍 Stops</h2>
+                `;
+
+                // Start from depot
+                html += `
+                    <div class="print-stop">
+                        <span class="stop-number">🏠</span>
+                        <span class="stop-address">START: ${pickupLocation.name}</span>
+                        <div class="stop-details">Pick up all deliveries here</div>
+                    </div>
+                `;
+
+                // Add each dropoff stop (use assigned route.stops array)
+                dropoffStops.forEach((loc, i) => {
+                    // Build Google/Apple directions links from depot to this stop
+                    let directionsLinks = '';
+                    if (pickupLocation && pickupLocation.coordinates && loc.coordinates) {
+                        const depotLat = pickupLocation.coordinates[1];
+                        const depotLon = pickupLocation.coordinates[0];
+                        const stopLat = loc.coordinates[1];
+                        const stopLon = loc.coordinates[0];
+                        const google = `https://www.google.com/maps/dir/?api=1&origin=${depotLat},${depotLon}&destination=${stopLat},${stopLon}&travelmode=driving`;
+                        const apple = `https://maps.apple.com/?saddr=${depotLat},${depotLon}&daddr=${stopLat},${stopLon}&dirflg=d`;
+                        directionsLinks = `<div style="margin-top:6px;"><a href="${google}" target="_blank">Google Directions</a> · <a href="${apple}" target="_blank">Apple Maps</a></div>`;
+                    }
+
+                    html += `
+                        <div class="print-stop">
+                            <span class="stop-number">${i + 1}</span>
+                            <span class="stop-address">${loc.name}</span>
+                            <div class="stop-details">Deliver package${directionsLinks}</div>
+                        </div>
+                    `;
+                });
+
+                // Return to depot
+                html += `
+                    <div class="print-stop">
+                        <span class="stop-number">🏠</span>
+                        <span class="stop-address">END: Return to ${pickupLocation.name}</span>
+                    </div>
+                `;
+
+                // Add turn-by-turn directions if available
+                if (route.directions && route.directions.legs) {
+                    html += `<h2 style="margin-top: 30px; margin-bottom: 10px;">🧭 Turn-by-Turn Directions</h2>`;
+
+                    route.directions.legs.forEach((leg, legIndex) => {
+                        html += `<div style="background: #f5f5f5; padding: 10px; margin: 10px 0; font-weight: bold;">
+                            Leg ${legIndex + 1}: ${(leg.distance / 1609.34).toFixed(1)} mi · ${Math.round(leg.duration / 60)} min
+                        </div>`;
+
+                        leg.steps.forEach(step => {
+                            const distMiles = (step.distance / 1609.34).toFixed(2);
+                            html += `
+                                <div class="directions-step">
+                                    <div class="instruction">${step.maneuver.instruction}</div>
+                                    <div class="distance">${distMiles} mi</div>
+                                </div>
+                            `;
+                        });
+                    });
+                }
+
+                html += `</div>`;
+            });
+
+            printContainer.innerHTML = html;
+        }
+
+        function clearAll() {
+            pickupLocation = null;
+            dropoffLocations = [];
+            optimizedRoutes = [];
+
+            document.getElementById('pickupAddress').value = '';
+            document.getElementById('dropoffInput').value = '';
+            renderDropoffList();
+
+            // Clear map
+            markers.forEach(m => m.remove());
+            markers = [];
+
+            routeLayers.forEach(layerId => {
+                if (map.getLayer(layerId)) map.removeLayer(layerId);
+                if (map.getSource(layerId)) map.removeSource(layerId);
+            });
+            routeLayers = [];
+
+            document.getElementById('resultsSection').style.display = 'none';
+            hideStatus();
+
+            // Reset map view
+            map.flyTo({ center: [-98.5795, 39.8283], zoom: 4 });
+        }
+    </script>
+</body>
+</html>
