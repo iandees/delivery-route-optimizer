@@ -20,27 +20,37 @@ app.get('/api/token', async (c) => {
   try {
     // Get the private Mapbox token from environment variables
     const privateToken = c.env.MAPBOX_PRIVATE_TOKEN;
+    // Get the Mapbox account username from environment variables
+    const username = c.env.MAPBOX_USERNAME;
 
     if (!privateToken) {
       return c.json({ error: 'Mapbox private token not configured' }, 500);
     }
 
+    if (!username) {
+      return c.json({ error: 'Mapbox username not configured' }, 500);
+    }
+
     // Create temporary token valid for 1 hour with limited scopes
-    const response = await fetch('https://api.mapbox.com/tokens/v2/temporary', {
+    // Use the account-specific tokens endpoint per Mapbox docs: POST /tokens/v2/{username}
+    const url = `https://api.mapbox.com/tokens/v2/${encodeURIComponent(username)}`;
+
+    // Expires must be an ISO 8601 string and no more than one hour in the future
+    const expiresIso = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+
+    const response = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${privateToken}`
       },
       body: JSON.stringify({
-        expires: Math.floor(Date.now() / 1000) + 3600, // 1 hour from now
+        expires: expiresIso,
         scopes: [
           'styles:read',
           'fonts:read',
           'datasets:read',
           'vision:read',
-          'navigation:trips',
-          'geocoding:read'
         ]
       })
     });
@@ -55,7 +65,7 @@ app.get('/api/token', async (c) => {
 
     return c.json({
       token: data.token,
-      expires: data.expires
+      expires: expiresIso,
     });
   } catch (error) {
     console.error('Error creating temporary token:', error);

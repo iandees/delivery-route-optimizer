@@ -622,15 +622,25 @@
                 }
 
                 mapboxToken = data.token;
-                tokenExpires = data.expires * 1000; // Convert to milliseconds
+                // Mapbox returns an ISO 8601 expires string — parse it to milliseconds
+                const parsedExpires = (new Date(data.expires)).getTime();
 
                 await initializeMap();
                 showTokenStatus('✓ Token ready', 'success');
                 document.getElementById('mainContent').classList.remove('hidden');
 
-                // Set up token refresh before expiration (refresh 5 minutes early)
-                const refreshTime = Math.max(0, tokenExpires - Date.now() - 5 * 60 * 1000);
-                setTimeout(refreshToken, refreshTime);
+                // Validate parsed expiry before scheduling a refresh. If parsing failed,
+                // avoid scheduling automatic refreshes to prevent tight retry loops.
+                if (Number.isFinite(parsedExpires) && parsedExpires > Date.now()) {
+                    tokenExpires = parsedExpires;
+                    // Set up token refresh before expiration (refresh 5 minutes early)
+                    const refreshTime = Math.max(0, tokenExpires - Date.now() - 5 * 60 * 1000);
+                    setTimeout(refreshToken, refreshTime);
+                } else {
+                    tokenExpires = 0;
+                    console.error('Invalid token expiry from server:', data.expires);
+                    showTokenStatus('⚠️ Received invalid token expiry; automatic refresh disabled', 'error');
+                }
 
             } catch (error) {
                 console.error('Failed to initialize:', error);
@@ -646,12 +656,21 @@
                     const data = await response.json();
                     if (!data.error) {
                         mapboxToken = data.token;
-                        tokenExpires = data.expires * 1000;
+                        // Parse ISO 8601 expires string to milliseconds
+                        const parsed = (new Date(data.expires)).getTime();
                         mapboxgl.accessToken = mapboxToken;
 
-                        // Schedule next refresh
-                        const refreshTime = Math.max(0, tokenExpires - Date.now() - 5 * 60 * 1000);
-                        setTimeout(refreshToken, refreshTime);
+                        // Only schedule the next refresh if the parsed expiry is valid.
+                        if (Number.isFinite(parsed) && parsed > Date.now()) {
+                            tokenExpires = parsed;
+                            const refreshTime = Math.max(0, tokenExpires - Date.now() - 5 * 60 * 1000);
+                            setTimeout(refreshToken, refreshTime);
+                        } else {
+                            // Don't retry continuously if server returned an invalid expiry
+                            tokenExpires = 0;
+                            console.error('Token refresh returned invalid expires value:', data.expires);
+                            showTokenStatus('⚠️ Token refresh returned invalid expiry; automatic refresh disabled', 'error');
+                        }
                     }
                 }
             } catch (error) {
@@ -661,18 +680,28 @@
 
         function showTokenStatus(message, type) {
             const apiKeySection = document.getElementById('apiKeySection');
-            let className = '';
+            if (!apiKeySection) return;
 
+            // On success, remove/hide the token status box entirely — only show the
+            // box when loading or on error.
             if (type === 'success') {
-                className = 'valid';
-            } else if (type === 'error') {
+                apiKeySection.classList.add('hidden');
+                apiKeySection.innerHTML = '';
+                return;
+            }
+
+            let className = '';
+            if (type === 'error') {
                 className = 'error';
+                // Ensure token-related errors are logged to the console for debugging
+                console.error('Token error:', message);
             } else if (type === 'loading') {
                 className = 'loading';
             }
 
             apiKeySection.className = `api-key-section ${className}`;
             apiKeySection.innerHTML = `<p style="margin: 0;">${message}</p>`;
+            apiKeySection.classList.remove('hidden');
         }
 
         async function initializeMap() {
@@ -702,10 +731,20 @@
         }
 
         async function ensureValidToken() {
-            // If token expires in less than 5 minutes, refresh it
-            if (Date.now() > tokenExpires - 5 * 60 * 1000) {
-                await refreshToken();
+            try {
+                // If we don't have a valid parsed expiry, avoid attempting refreshes
+                if (!Number.isFinite(tokenExpires) || tokenExpires <= 0) {
+                    return mapboxToken;
+                }
+
+                // If token expires in less than 5 minutes, refresh it
+                if (Date.now() > tokenExpires - 5 * 60 * 1000) {
+                    await refreshToken();
+                }
+            } catch (e) {
+                console.error('ensureValidToken error:', e);
             }
+
             return mapboxToken;
         }
 

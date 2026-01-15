@@ -13,3 +13,15 @@ directory = "./public"
 
 # Secrets (set via wrangler secret put)
 # MAPBOX_PRIVATE_TOKEN - Your Mapbox private token
+
+# Non-secret environment variables (override or remove the example before publishing)
+[vars]
+# Set your Mapbox account username here, or set it in your environment when deploying.
+MAPBOX_USERNAME = "iandees"
+
+# Keep MAPBOX_PRIVATE_TOKEN as a secret via `wrangler secret put MAPBOX_PRIVATE_TOKEN`
+
+[observability]
+[observability.logs]
+enabled = true
+invocation_logs = true
