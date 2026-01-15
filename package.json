@@ -1,0 +1,25 @@
+{
+  "name": "mutual-aid-drive-routes",
+  "version": "1.0.0",
+  "description": "A web application to help optimize driving routes for volunteers doing deliveries for mutual aid organizations",
+  "main": "src/index.js",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "deploy:staging": "wrangler deploy --env staging"
+  },
+  "dependencies": {
+    "hono": "^4.0.0"
+  },
+  "devDependencies": {
+    "wrangler": "^4.59.2"
+  },
+  "keywords": [
+    "mutual-aid",
+    "route-optimization",
+    "mapbox",
+    "cloudflare-workers"
+  ],
+  "author": "",
+  "license": "MIT"
+}

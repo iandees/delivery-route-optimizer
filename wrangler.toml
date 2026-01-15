@@ -1,0 +1,15 @@
+name = "mutual-aid-drive-routes"
+main = "src/index.js"
+compatibility_date = "2024-01-15"
+workers_dev = true
+preview_urls = true
+routes = [
+  { pattern = "routeoptimizer.mapki.com", custom_domain = true }
+]
+
+# Assets configuration for serving static files
+[assets]
+directory = "./public"
+
+# Secrets (set via wrangler secret put)
+# MAPBOX_PRIVATE_TOKEN - Your Mapbox private token
