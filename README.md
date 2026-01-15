@@ -14,27 +14,21 @@ A web application to help optimize driving routes for volunteers doing deliverie
 
 ## Getting Started
 
-### 1. Get a Mapbox Access Token
+### 1. Token handling
 
-1. Sign up for a free account at [mapbox.com](https://www.mapbox.com/)
-2. Go to your [Access Tokens page](https://account.mapbox.com/access-tokens/)
-3. Copy your default public token (starts with `pk.`)
+The app automatically requests a short-lived Mapbox access token from a Cloudflare Worker; you do not need to obtain or paste a token yourself. The token is vended by the app at runtime and is stored in your browser's local storage for subsequent visits.
 
 ### 2. Open the App
 
 Simply open `index.html` in a modern web browser (Chrome, Firefox, Safari, Edge). No server or build process required.
 
-### 3. Enter Your Token
-
-Paste your Mapbox access token when prompted. It will be saved in your browser's local storage for future use.
-
-### 4. Set Up Your Deliveries
+### 3. Set Up Your Deliveries
 
 1. **Enter the pickup address** - Start typing and select from the autocomplete suggestions (biased to US addresses)
 2. **Set the number of drivers** - How many volunteers are available (1-20)
 3. **Add dropoff locations** - Enter each delivery address and click "Add" (autocomplete results are biased toward the pickup location)
 
-### 5. Optimize Routes
+### 4. Optimize Routes
 
 Click "🗺️ Optimize Routes" to calculate the best routes. The app will:
 - Assign stops to drivers using angular sweep clustering around the depot
@@ -42,7 +36,7 @@ Click "🗺️ Optimize Routes" to calculate the best routes. The app will:
 - Display routes on the map with colored lines and numbered markers
 - Show a legend with distance, estimated time, and action buttons for each driver
 
-### 6. Get Directions
+### 5. Get Directions
 
 For each driver's route, you can:
 - Click **Google** to open the full route in Google Maps
