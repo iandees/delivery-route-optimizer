@@ -949,23 +949,72 @@
             document.getElementById('statusMessage').classList.add('hidden');
         }
 
-        // Helper: assign dropoffs to vehicles using angular sweep clustering around depot
+        // Helper: assign dropoffs to vehicles using angular-gap clustering around depot
+        // Improved: find the k-1 largest angular gaps and cut there so each cluster
+        // is a contiguous angular segment. This prevents round-robin interleaving
+        // (e.g., two stops east and two west become two contiguous clusters).
         function assignClusters(dropoffs, k) {
             const clusters = Array.from({ length: k }, () => []);
             if (!pickupLocation || dropoffs.length === 0) return clusters;
 
             const [depotLon, depotLat] = pickupLocation.coordinates;
-            const withAngle = dropoffs.map((d, i) => {
+            const arr = dropoffs.map((d, i) => {
                 const [lon, lat] = d.coordinates;
-                const angle = Math.atan2(lat - depotLat, lon - depotLon);
+                let angle = Math.atan2(lat - depotLat, lon - depotLon);
+                if (angle < 0) angle += 2 * Math.PI; // normalize to [0, 2π)
                 return { d, angle, i };
             });
 
-            withAngle.sort((a, b) => a.angle - b.angle);
+            arr.sort((a, b) => a.angle - b.angle);
 
-            for (let i = 0; i < withAngle.length; i++) {
-                clusters[i % k].push(withAngle[i].d);
+            const n = arr.length;
+            // If there are at least as many vehicles as stops, give at most one stop per vehicle
+            if (k >= n) {
+                for (let i = 0; i < n; i++) clusters[i].push(arr[i].d);
+                return clusters;
             }
+
+            // Compute gaps between consecutive angles (circularly)
+            const gaps = [];
+            for (let i = 0; i < n; i++) {
+                const next = (i + 1) % n;
+                const gap = (arr[next].angle - arr[i].angle + 2 * Math.PI) % (2 * Math.PI);
+                gaps.push({ gap, index: i }); // gap between i and next
+            }
+
+            // Select the m largest gaps as cut points, where m = min(k, n)
+            const m = Math.min(k, n);
+            const largest = gaps.slice().sort((a, b) => b.gap - a.gap).slice(0, m);
+            // Convert to cut start positions (the index after the gap)
+            let cuts = largest.map(g => (g.index + 1) % n);
+            // Ensure cuts are unique and sorted
+            cuts = Array.from(new Set(cuts)).sort((a, b) => a - b);
+
+            // If no cuts (k === 1), put all into first cluster
+            if (cuts.length === 0) {
+                clusters[0] = arr.map(a => a.d);
+                return clusters;
+            }
+
+            // Build contiguous segments between cuts (circular)
+            // cuts.length == number of segments we will produce (<= k)
+            for (let segIdx = 0; segIdx < cuts.length; segIdx++) {
+                const start = cuts[segIdx];
+                const end = cuts[(segIdx + 1) % cuts.length];
+
+                const seg = [];
+                let i = start;
+                while (true) {
+                    seg.push(arr[i].d);
+                    i = (i + 1) % n;
+                    if (i === end) break;
+                }
+
+                // Assign to cluster index segIdx (remaining clusters stay empty)
+                const assignIdx = segIdx < k ? segIdx : k - 1;
+                clusters[assignIdx] = clusters[assignIdx].concat(seg);
+            }
+
             return clusters;
         }
 
